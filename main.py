@@ -58,9 +58,9 @@ def normalizar_documento(doc_str):
     return doc_str.strip()
 
 
-def processar_relatorio_diamante(caminho_arquivo):
+def processar_nosso_relatorio(caminho_arquivo):
     """
-    Lê e processa o relatório da Diamante (semiestruturado).
+    Lê e processa o nosso relatório (agora o semiestruturado).
     """
     df = pd.read_csv(caminho_arquivo, header=None, encoding='latin-1', delimiter=';', on_bad_lines='warn',
                      engine='python')
@@ -97,26 +97,26 @@ def processar_relatorio_diamante(caminho_arquivo):
                 f"LANCAMENTO_VAZIO_LINHA_{index}", "N/A")
 
         if documento and (valor := limpar_valor(valor_str)) is not None and valor > 0:
-            dados_extraidos.append({'Documento': documento, 'Sacado_Diamante': sacado, 'Valor_Diamante': valor})
+            dados_extraidos.append({'Documento': documento, 'Sacado_Nosso': sacado, 'Valor_Nosso': valor})
 
     return pd.DataFrame(dados_extraidos)
 
 
-def processar_nosso_relatorio(caminho_arquivo):
+def processar_relatorio_diamante(caminho_arquivo):
     """
-    Lê e processa o nosso relatório (estruturado).
+    Lê e processa o relatório da Diamante (agora o estruturado).
     """
     df = pd.read_csv(caminho_arquivo, encoding='latin-1', delimiter=',')
     df = df[['Documento', 'Sacado', 'Valor', 'Valor Pago']].rename(columns={
-        'Valor': 'Valor_Original_Nosso', 'Valor Pago': 'Valor_Pago_Nosso', 'Sacado': 'Sacado_Nosso'
+        'Valor': 'Valor_Original_Diamante', 'Valor Pago': 'Valor_Pago_Diamante', 'Sacado': 'Sacado_Diamante'
     })
-    df['Valor_Original_Nosso'] = df['Valor_Original_Nosso'].apply(limpar_valor)
-    df['Valor_Pago_Nosso'] = df['Valor_Pago_Nosso'].apply(limpar_valor)
+    df['Valor_Original_Diamante'] = df['Valor_Original_Diamante'].apply(limpar_valor)
+    df['Valor_Pago_Diamante'] = df['Valor_Pago_Diamante'].apply(limpar_valor)
     df['Documento'] = df['Documento'].astype(str).str.strip()
     return df
 
 
-def gerar_relatorio_excel(df_diamante_agg, df_nosso_agg, df_comparativo, caminho_saida):
+def gerar_relatorio_excel(df_nosso_agg, df_diamante_agg, df_comparativo, caminho_saida):
     """
     Gera um relatório Excel detalhado com a análise completa.
     """
@@ -131,66 +131,53 @@ def gerar_relatorio_excel(df_diamante_agg, df_nosso_agg, df_comparativo, caminho
 
         # Cálculos e DataFrames
         df_ambos = df_comparativo[df_comparativo['_merge'] == 'both'].copy()
-        df_ambos['Juros/Taxas (Nosso)'] = df_ambos['Valor_Pago_Nosso'] - df_ambos['Valor_Original_Nosso']
-        df_ambos['Diferenca_Liquida'] = df_ambos['Valor_Pago_Nosso'] - df_ambos['Valor_Diamante']
+        df_ambos['Juros/Taxas (Diamante)'] = df_ambos['Valor_Pago_Diamante'] - df_ambos['Valor_Original_Diamante']
+        df_ambos['Diferenca_Liquida'] = df_ambos['Valor_Pago_Diamante'] - df_ambos['Valor_Nosso']
 
-        df_so_diamante = df_comparativo[df_comparativo['_merge'] == 'left_only'].copy()
-        df_so_nosso = df_comparativo[df_comparativo['_merge'] == 'right_only'].copy()
-        df_so_nosso['Juros/Taxas (Nosso)'] = df_so_nosso['Valor_Pago_Nosso'] - df_so_nosso['Valor_Original_Nosso']
+        df_so_nosso = df_comparativo[df_comparativo['_merge'] == 'left_only'].copy()
+        df_so_diamante = df_comparativo[df_comparativo['_merge'] == 'right_only'].copy()
+        df_so_diamante['Juros/Taxas (Diamante)'] = df_so_diamante['Valor_Pago_Diamante'] - df_so_diamante['Valor_Original_Diamante']
 
         # Aba de Sumário
         sumario_data = {
-            'Métrica': ['Documentos Únicos (Razão)', 'Valor Total (Razão)', '',
+            'Métrica': ['Documentos Únicos (Nosso Relatório)', 'Valor Total (Nosso)', '',
                         'Documentos Únicos (Diamante)', 'Valor Original (Diamante)', 'Valor Pago (Diamante)',
                         'Total Juros/Taxas (Diamante)', '', 'Documentos Correspondentes',
                         'Documentos com Diferença de Valor', 'Valor Total das Diferenças Líquidas', '',
-                        'Documentos Apenas no Rel. Razão', 'Valor Total:', '',
-                        'Documentos Apenas no Rel. Diamante', 'Valor Total:', '', 'VALIDAÇÃO FINAL',
-                        'Diferença Real (Total Pago Nosso - Total Diamante)',
+                        'Documentos Apenas no Nosso Relatório', 'Valor Total (Apenas Nosso)', '',
+                        'Documentos Apenas no Rel. Diamante', 'Valor Total (Apenas Diamante)', '', 'VALIDAÇÃO FINAL',
+                        'Diferença Real (Total Pago Diamante - Total Nosso)',
                         'Diferença Calculada (Soma das Discrepâncias)'],
-            'Valor': [df_diamante_agg['Documento'].nunique(), df_diamante_agg['Valor_Diamante'].sum(), None,
-                      df_nosso_agg['Documento'].nunique(), df_nosso_agg['Valor_Original_Nosso'].sum(),
-                      df_nosso_agg['Valor_Pago_Nosso'].sum(), df_nosso_agg['Juros/Taxas (Nosso)'].sum(), None,
+            'Valor': [df_nosso_agg['Documento'].nunique(), df_nosso_agg['Valor_Nosso'].sum(), None,
+                      df_diamante_agg['Documento'].nunique(), df_diamante_agg['Valor_Original_Diamante'].sum(),
+                      df_diamante_agg['Valor_Pago_Diamante'].sum(), df_diamante_agg['Juros/Taxas (Diamante)'].sum(), None,
                       len(df_ambos), len(df_ambos[df_ambos['Diferenca_Liquida'].abs() > 0.01]),
-                      df_ambos['Diferenca_Liquida'].sum(), None, len(df_so_diamante),
-                      df_so_diamante['Valor_Diamante'].sum(), None, len(df_so_nosso),
-                      df_so_nosso['Valor_Pago_Nosso'].sum(), None, "SUCESSO" if abs(
-                    (df_nosso_agg['Valor_Pago_Nosso'].sum() - df_diamante_agg['Valor_Diamante'].sum()) - (
-                            df_ambos['Diferenca_Liquida'].sum() - df_so_diamante['Valor_Diamante'].sum() +
-                            df_so_nosso['Valor_Pago_Nosso'].sum())) < 0.01 else "FALHA",
-                      df_nosso_agg['Valor_Pago_Nosso'].sum() - df_diamante_agg['Valor_Diamante'].sum(),
-                      df_ambos['Diferenca_Liquida'].sum() - df_so_diamante['Valor_Diamante'].sum() + df_so_nosso[
-                          'Valor_Pago_Nosso'].sum()]
+                      df_ambos['Diferenca_Liquida'].sum(), None, len(df_so_nosso),
+                      df_so_nosso['Valor_Nosso'].sum(), None, len(df_so_diamante),
+                      df_so_diamante['Valor_Pago_Diamante'].sum(), None, "SUCESSO" if abs(
+                    (df_diamante_agg['Valor_Pago_Diamante'].sum() - df_nosso_agg['Valor_Nosso'].sum()) - (
+                                df_ambos['Diferenca_Liquida'].sum() - df_so_nosso['Valor_Nosso'].sum() +
+                                df_so_diamante['Valor_Pago_Diamante'].sum())) < 0.01 else "FALHA",
+                      df_diamante_agg['Valor_Pago_Diamante'].sum() - df_nosso_agg['Valor_Nosso'].sum(),
+                      df_ambos['Diferenca_Liquida'].sum() - df_so_nosso['Valor_Nosso'].sum() + df_so_diamante[
+                          'Valor_Pago_Diamante'].sum()]
         }
         pd.DataFrame(sumario_data).to_excel(writer, sheet_name='Sumario_Conciliacao', index=False)
 
-        # --- ABA: Diferencas_de_Valor (COM CABEÇALHOS PERSONALIZADOS) ---
-        colunas_diferenca = ['Documento', 'Valor_Original_Nosso', 'Juros/Taxas (Nosso)', 'Valor_Pago_Nosso',
-                             'Valor_Diamante', 'Diferenca_Liquida']
-        df_diferencas_export = df_ambos[df_ambos['Diferenca_Liquida'].abs() > 0.01][colunas_diferenca].copy()
+        # Abas de detalhes
+        colunas_diferenca = ['Documento', 'Valor_Original_Diamante', 'Juros/Taxas (Diamante)', 'Valor_Pago_Diamante',
+                             'Valor_Nosso', 'Diferenca_Liquida']
+        df_ambos[df_ambos['Diferenca_Liquida'].abs() > 0.01][colunas_diferenca].to_excel(writer,
+                                                                                         sheet_name='Diferencas_de_Valor',
+                                                                                         index=False)
 
-        # Renomeia as colunas para a exportação
-        df_diferencas_export.columns = ['Documento', 'Valor_Original', 'Encargos', 'Valor_Pago', 'Valor_Razão',
-                                        'Diferenca_Liquida']
+        df_so_nosso[['Documento', 'Sacado_Nosso', 'Valor_Nosso']].to_excel(writer,
+                                                                          sheet_name='Apenas_no_Nosso_Relatorio',
+                                                                          index=False)
 
-        df_diferencas_export.to_excel(writer,
-                                      sheet_name='Diferencas_de_Valor',
-                                      index=False)
-
-        # --- ABA: Apenas_Razão (COM CABEÇALHOS PERSONALIZADOS) ---
-        df_razao_export = df_so_diamante[['Documento', 'Sacado_Diamante', 'Valor_Diamante']].copy()
-
-        # Renomeia as colunas para a exportação
-        df_razao_export.columns = ['Documento', 'Sacado', 'Valor']
-
-        df_razao_export.to_excel(writer,
-                                 sheet_name='Apenas_Razão',
-                                 index=False)
-
-        # --- ABA: Apenas_Diamante (sem alteração de cabeçalho) ---
-        colunas_so_nosso = ['Documento', 'Sacado_Nosso', 'Valor_Original_Nosso', 'Juros/Taxas (Nosso)',
-                            'Valor_Pago_Nosso']
-        df_so_nosso[colunas_so_nosso].to_excel(writer, sheet_name='Apenas_Diamante', index=False)
+        colunas_so_diamante = ['Documento', 'Sacado_Diamante', 'Valor_Original_Diamante', 'Juros/Taxas (Diamante)',
+                               'Valor_Pago_Diamante']
+        df_so_diamante[colunas_so_diamante].to_excel(writer, sheet_name='Apenas_no_Rel_Diamante', index=False)
 
         # Formatação e auto-ajuste
         workbook = writer.book
@@ -201,20 +188,17 @@ def gerar_relatorio_excel(df_diamante_agg, df_nosso_agg, df_comparativo, caminho
         if 'integer' not in workbook.style_names:
             workbook.add_named_style(integer_style)
 
-        # Ajuste nas colunas de formatação para corresponder aos novos nomes/posições
         sheets_to_format = {
             'Diferencas_de_Valor': ['B', 'C', 'D', 'E', 'F'],
-            'Apenas_Diamante': ['C', 'D', 'E'],  # Corrigido para incluir todas as colunas de valor
-            'Apenas_Razão': ['C']  # Agora é apenas a coluna C
+            'Apenas_no_Nosso_Relatorio': ['C'],
+            'Apenas_no_Rel_Diamante': ['C', 'D', 'E']
         }
         for sheet_name, cols in sheets_to_format.items():
-            if sheet_name in writer.sheets:
-                ws = writer.sheets[sheet_name]
-                ws.auto_filter.ref = ws.dimensions
-                for col_letter in cols:
-                    # Itera a partir da segunda linha para não formatar o cabeçalho
-                    for cell in ws[col_letter][1:]:
-                        cell.style = 'currency_br'
+            ws = writer.sheets[sheet_name]
+            ws.auto_filter.ref = ws.dimensions
+            for col_letter in cols:
+                for cell in ws[col_letter][1:]:
+                    cell.style = 'currency_br'
 
         ws_sumario = writer.sheets['Sumario_Conciliacao']
         for cell in ws_sumario['B'][1:]:
@@ -227,11 +211,7 @@ def gerar_relatorio_excel(df_diamante_agg, df_nosso_agg, df_comparativo, caminho
         for sheet_name in writer.sheets:
             worksheet = writer.sheets[sheet_name]
             for column_cells in worksheet.columns:
-                # Calcula o comprimento máximo entre o cabeçalho e os valores da coluna
-                header_length = len(str(column_cells[0].value))
-                max_length_data = max((len(str(cell.value)) for cell in column_cells[1:] if cell.value is not None),
-                                      default=0)
-                max_length = max(header_length, max_length_data)
+                max_length = max((len(str(cell.value)) for cell in column_cells if cell.value is not None), default=0)
                 worksheet.column_dimensions[column_cells[0].column_letter].width = (max_length + 2)
 
 
@@ -241,8 +221,8 @@ class ReconciliationApp:
         self.root.title("Reconciliador de Relatórios")
         self.root.geometry("600x400")
 
-        self.diamante_path = tk.StringVar()
         self.nosso_path = tk.StringVar()
+        self.diamante_path = tk.StringVar()
         self.output_path = ""
         self.thread_queue = queue.Queue()
         self.is_running = False
@@ -252,17 +232,17 @@ class ReconciliationApp:
         main_frame.pack(fill=tk.BOTH, expand=True)
 
         # File selection
-        ttk.Label(main_frame, text="Relatório Razão:").grid(row=0, column=0, sticky="w", pady=2)
-        ttk.Entry(main_frame, textvariable=self.diamante_path, state="readonly").grid(row=0, column=1, sticky="ew",
+        ttk.Label(main_frame, text="Nosso Relatório (interno):").grid(row=0, column=0, sticky="w", pady=2)
+        ttk.Entry(main_frame, textvariable=self.nosso_path, state="readonly").grid(row=0, column=1, sticky="ew",
                                                                                       padx=5)
-        ttk.Button(main_frame, text="Selecionar...", command=lambda: self.select_file(self.diamante_path,
-                                                                                      "Selecione o relatório Razão")).grid(
+        ttk.Button(main_frame, text="Selecionar...", command=lambda: self.select_file(self.nosso_path,
+                                                                                      "Selecione o Nosso Relatório (CSV semiestruturado)")).grid(
             row=0, column=2)
 
-        ttk.Label(main_frame, text="Relatório Diamante:").grid(row=1, column=0, sticky="w", pady=2)
-        ttk.Entry(main_frame, textvariable=self.nosso_path, state="readonly").grid(row=1, column=1, sticky="ew", padx=5)
-        ttk.Button(main_frame, text="Selecionar...", command=lambda: self.select_file(self.nosso_path,
-                                                                                      "Selecione o relatório Diamante")).grid(
+        ttk.Label(main_frame, text="Relatório Diamante (externo):").grid(row=1, column=0, sticky="w", pady=2)
+        ttk.Entry(main_frame, textvariable=self.diamante_path, state="readonly").grid(row=1, column=1, sticky="ew", padx=5)
+        ttk.Button(main_frame, text="Selecionar...", command=lambda: self.select_file(self.diamante_path,
+                                                                                      "Selecione o relatório Diamante (CSV estruturado)")).grid(
             row=1, column=2)
 
         # Controls
@@ -290,7 +270,7 @@ class ReconciliationApp:
             self.check_paths()
 
     def check_paths(self):
-        if self.diamante_path.get() and self.nosso_path.get():
+        if self.nosso_path.get() and self.diamante_path.get():
             self.generate_button.config(state="normal")
         else:
             self.generate_button.config(state="disabled")
@@ -348,35 +328,35 @@ class ReconciliationApp:
 
     def run_reconciliation(self):
         try:
-            self.thread_queue.put(("progress", 10, "Processando relatório Diamante..."))
-            df_diamante = processar_relatorio_diamante(self.diamante_path.get())
-
-            self.thread_queue.put(("progress", 30, "Processando nosso relatório..."))
+            self.thread_queue.put(("progress", 10, "Processando nosso relatório..."))
             df_nosso = processar_nosso_relatorio(self.nosso_path.get())
 
+            self.thread_queue.put(("progress", 30, "Processando relatório Diamante..."))
+            df_diamante = processar_relatorio_diamante(self.diamante_path.get())
+
             self.thread_queue.put(("progress", 50, "Normalizando documentos..."))
-            df_diamante['Documento_Norm'] = df_diamante['Documento'].apply(normalizar_documento)
             df_nosso['Documento_Norm'] = df_nosso['Documento'].apply(normalizar_documento)
+            df_diamante['Documento_Norm'] = df_diamante['Documento'].apply(normalizar_documento)
 
             self.thread_queue.put(("progress", 60, "Agregando valores..."))
-            df_diamante_agg = df_diamante.groupby('Documento_Norm').agg(Valor_Diamante=('Valor_Diamante', 'sum'),
-                                                                        Sacado_Diamante=('Sacado_Diamante',
-                                                                                         'first')).reset_index()
-            df_nosso_agg = df_nosso.groupby('Documento_Norm').agg(Valor_Original_Nosso=('Valor_Original_Nosso', 'sum'),
-                                                                  Valor_Pago_Nosso=('Valor_Pago_Nosso', 'sum'),
-                                                                  Sacado_Nosso=('Sacado_Nosso', 'first')).reset_index()
-            df_nosso_agg['Juros/Taxas (Nosso)'] = df_nosso_agg['Valor_Pago_Nosso'] - df_nosso_agg[
-                'Valor_Original_Nosso']
+            df_nosso_agg = df_nosso.groupby('Documento_Norm').agg(Valor_Nosso=('Valor_Nosso', 'sum'),
+                                                                  Sacado_Nosso=('Sacado_Nosso',
+                                                                                   'first')).reset_index()
+            df_diamante_agg = df_diamante.groupby('Documento_Norm').agg(Valor_Original_Diamante=('Valor_Original_Diamante', 'sum'),
+                                                                        Valor_Pago_Diamante=('Valor_Pago_Diamante', 'sum'),
+                                                                        Sacado_Diamante=('Sacado_Diamante', 'first')).reset_index()
+            df_diamante_agg['Juros/Taxas (Diamante)'] = df_diamante_agg['Valor_Pago_Diamante'] - df_diamante_agg[
+                'Valor_Original_Diamante']
 
             self.thread_queue.put(("progress", 70, "Cruzando informações..."))
-            df_diamante_agg.rename(columns={'Documento_Norm': 'Documento'}, inplace=True)
             df_nosso_agg.rename(columns={'Documento_Norm': 'Documento'}, inplace=True)
-            df_comparativo = pd.merge(df_diamante_agg, df_nosso_agg, on='Documento', how='outer', indicator=True)
+            df_diamante_agg.rename(columns={'Documento_Norm': 'Documento'}, inplace=True)
+            df_comparativo = pd.merge(df_nosso_agg, df_diamante_agg, on='Documento', how='outer', indicator=True)
 
             self.thread_queue.put(("progress", 80, "Gerando planilha Excel..."))
-            pasta_saida = os.path.dirname(self.diamante_path.get())
+            pasta_saida = os.path.dirname(self.nosso_path.get())
             self.output_path = os.path.join(pasta_saida, "Relatorio_Conciliacao.xlsx")
-            gerar_relatorio_excel(df_diamante_agg, df_nosso_agg, df_comparativo, self.output_path)
+            gerar_relatorio_excel(df_nosso_agg, df_diamante_agg, df_comparativo, self.output_path)
 
             self.thread_queue.put(("progress", 100, "Análise concluída."))
             self.thread_queue.put(("done",))
